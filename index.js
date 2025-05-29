@@ -1,105 +1,99 @@
 const firecrawl = require('@mendable/firecrawl-js'); // Import the module
 const FirecrawlApp = firecrawl.default; // Access the default export
-
+const summarize = require('./summarize.js')
 const dotenv = require('dotenv/config');
 const fs = require('fs');
+const rankStories = require('./rankStories.js')
+const prepSubUrls = require('./prepSubUrls.js')
+// const app = new FirecrawlApp({ apiKey: "fc-YOUR_API_KEY" });
+
+// // Scrape a website:
+// (async () => {
+//   try {
+//     const scrapeResult = await app.scrapeUrl('firecrawl.dev', { formats: ['markdown', 'html'] });
+
+//     if (!scrapeResult.success) {
+//       throw new Error(`Failed to scrape: ${scrapeResult.error}`);
+//     }
+
+//     console.log(scrapeResult);
+//   } catch (error) {
+//     console.error(error);
+//   }
+// })();
+
 
 
 
 
 const app = new FirecrawlApp({ apiKey: process.env.FC_Key });
 
-async function doAScrape() {
-	const scrapeResponse = await app.scrapeUrl('https://notthebee.com/article/watch-president-trump-was-in-rare-form-as-he-schooled-antagonistic-abc-news-interviewer', {
+async function doAScrape(url, executionNum) {
+	const scrapeResponse = await app.scrapeUrl(url, {
 		formats: ['markdown'],
 	});
 
 	if (!scrapeResponse.success) {
 		throw new Error(`Failed to scrape: ${scrapeResponse.error}`);
 	}
-
-    fs.writeFileSync('./response.json', JSON.stringify(scrapeResponse.markdown, null, 4))
-    const summation = await makeASummary(scrapeResponse.markdown)
-    fs.writeFileSync('./summation.json', )
+    // if (fs.existsSync(`./response${executionNum}.json`)) {
+    //     fs.cre
+    // }
+    fs.writeFileSync(`./response${String(executionNum)}.md`, JSON.stringify(scrapeResponse.markdown, null, 4))
+    // const summation = await makeASummary(scrapeResponse.markdown)
+    // fs.writeFileSync('./summation.json', )
 	
-    console.log(summation);
+    // console.log(summation); 
 }
-// doAScrape()
+// const scrapeUrl = 'https://notthebee.com/article/watch-president-trump-was-in-rare-form-as-he-schooled-antagonistic-abc-news-interviewer'
+// const scrapeUrl = 'https://ground.news/' 
+const scrapeUrl = 'https://notthebee.com/'
 
+const executionNum = 2;
 
-
-
-async function makeASummary(text) {
-    const url = `https://ln-worker.judah-ddd.workers.dev`
-
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    })
-    console.log(await response.json())
-    // return await response.json()
-
-}
+// doAScrape(scrapeUrl, executionNum)
 
 const sample = fs.readFileSync('response.md', 'utf8');
-// const sumSample = makeASummary(sample)
 
-async function streamSSE(url, text) {
-    console.log('hello')
-    let finalMessage = '';
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            text: text
-        })
-    });
-  
-    if (!response.body) {
-      console.error('ReadableStream not supported in this environment.');
-      return;
+const urlsToScrape = [
+	"https://ground.news/article/labor-wins-australia-election-broadcasters-abc-sky-news-australia-say",
+	"https://ground.news/article/nypd-shared-a-palestinian-protesters-info-with-ice-now-its-evidence-in-her-deportation-case",
+	"https://ground.news/article/nypd-shared-a-palestinian-protesters-info-with-ice-now-its-evidence-in-her-deportation-case",
+	"https://ground.news/article/trump-department-of-justice-sues-colorado-denver-officials-over-immigration-laws",
+	"https://ground.news/article/scientific-societies-say-theyll-step-up-after-trump-puts-key-climate-report-in-doubt",
+	"https://ground.news/article/voters-to-decide-if-the-texas-home-of-elon-musks-spacex-should-become-an-official-city-starbase_60c091",
+	"https://ground.news/article/us-state-department-approves-sale-of-f-16-spare-parts-to-ukraine",
+	"https://ground.news/article/devastating-quad-cities-organizations-scramble-after-americorps-cuts"
+];
+async function getSubStories(urlsToScrape, currentIteration) {
+    const responsesToProcess = [];
+    for (const url in urlsToScrape) {
+        console.log(urlsToScrape[url])
+        await doAScrape(urlsToScrape[url], currentIteration)
+        console.log(String(currentIteration))
+        responsesToProcess.push(String(currentIteration))
+        currentIteration++
     }
-  
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-  
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-  
-      buffer += decoder.decode(value, { stream: true });
-  
-      // Split buffer by newlines to process SSE lines
-      let lines = buffer.split('\n');
-      buffer = lines.pop(); // keep incomplete line for next chunk
-  
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-  
-          if (data === '[DONE]') {
-            console.log('Stream finished');
-            console.log(finalMessage)
-            return;
-          }
-  
-          // Process the chunk data (usually JSON or text)
-          console.log('Received chunk:', data);
-          let jsonData = await JSON.parse(data)
-          console.log('...')
-          console.log(jsonData.response)
-          finalMessage = finalMessage + jsonData.response
-          // For example, if data is JSON:
-          // const parsed = JSON.parse(data);
-          // update UI with parsed content
-        }
-      }
+    for (const num in responsesToProcess) {
+        const articleInfo = fs.readFileSync(`./response${responsesToProcess[num]}.md`, 'utf8')
+        const newSummary = await summarize(articleInfo)
+        const summaries = await JSON.parse(fs.readFileSync(`./summaries.json`, 'utf8'));
+
+        summaries.push(newSummary)
+
+        fs.writeFileSync(`./summaries.json`, JSON.stringify(summaries, null, 4))
+
     }
-  }
-streamSSE('https://ln-worker.judah-ddd.workers.dev', sample);
-  
+}
+
+// getSubStories(urlsToScrape, executionNum)
+
+async function getRankedStories() {
+    const summaries = fs.readFileSync(`./summaries.json`, 'utf8')
+
+    const finalRanking = await rankStories(summaries);
+    const finalRankingArr = finalRanking.split('&&')
+    console.log(finalRankingArr)
+}
+
+prepSubUrls()
