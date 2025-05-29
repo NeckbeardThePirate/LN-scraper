@@ -36,9 +36,6 @@ async function doAScrape(url, executionNum) {
 	if (!scrapeResponse.success) {
 		throw new Error(`Failed to scrape: ${scrapeResponse.error}`);
 	}
-    // if (fs.existsSync(`./response${executionNum}.json`)) {
-    //     fs.cre
-    // }
     fs.writeFileSync(`./response${String(executionNum)}.md`, JSON.stringify(scrapeResponse.markdown, null, 4))
     // const summation = await makeASummary(scrapeResponse.markdown)
     // fs.writeFileSync('./summation.json', )
@@ -49,7 +46,7 @@ async function doAScrape(url, executionNum) {
 // const scrapeUrl = 'https://ground.news/' 
 const scrapeUrl = 'https://notthebee.com/'
 
-const executionNum = 2;
+const executionNum = 22;
 
 // doAScrape(scrapeUrl, executionNum)
 
