@@ -4,24 +4,6 @@ const FirecrawlApp = firecrawl.default; // Access the default export
 const dotenv = require('dotenv/config');
 const fs = require('fs');
 
-// const app = new FirecrawlApp({ apiKey: "fc-YOUR_API_KEY" });
-
-// // Scrape a website:
-// (async () => {
-//   try {
-//     const scrapeResult = await app.scrapeUrl('firecrawl.dev', { formats: ['markdown', 'html'] });
-
-//     if (!scrapeResult.success) {
-//       throw new Error(`Failed to scrape: ${scrapeResult.error}`);
-//     }
-
-//     console.log(scrapeResult);
-//   } catch (error) {
-//     console.error(error);
-//   }
-// })();
-
-
 
 
 
@@ -42,51 +24,82 @@ async function doAScrape() {
 	
     console.log(summation);
 }
-
 // doAScrape()
 
 
+
+
 async function makeASummary(text) {
-    const url = `https://gateway.ai.cloudflare.com/v1/${process.env.ENDPOINT_ID}/test-gateway/workers-ai/@cf/meta/llama-3.1-8b-instruct`
+    const url = `https://ln-worker.judah-ddd.workers.dev`
 
     const response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.API_TOKEN}`
-        },
-        body: JSON.stringify({
-                    provider: 'workers-ai',
-                    //   endpoint: "@cf/qwen/qwen1.5-7b-chat-awq",
-                    //   endpoint: "@cf/meta/llama-2-7b-chat-fp16",
-                    endpoint: '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
-                    //   endpoint: "@cf/meta/llama-2-7b-chat-fp16",
-        
-                    headers: {
-                        Authorization: `Bearer ${myToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    query: {
-                        messages: [
-                            {
-                                role: 'system',
-                                content: `Your job is to take each task you receive and break it into ${subItems} smaller comma separated generic subtasks, the smaller tasks should be comma delimited and there should be ${subItems}, do not do or say anything other than the returned set of comma delimited subtasks. For instance: 'Change Babys Diaper': Gather Supplies, Take off outfit, Undo diaper, Put on new diaper, Put outfit back on. They should be in the most proper and helpful order possible, when in doubt greater specificity is better`,
-                            },
-                            {
-                                role: 'user',
-                                content: `${task}`,
-                            },
-                        ],
-                    },
-            prompt: `Summarize this news story like an old school tweet: ${text}`
-        })
+        }
     })
     console.log(await response.json())
     // return await response.json()
 
 }
 
-
 const sample = fs.readFileSync('response.md', 'utf8');
-const sumSample = makeASummary(sample)
+// const sumSample = makeASummary(sample)
 
+async function streamSSE(url, text) {
+    console.log('hello')
+    let finalMessage = '';
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            text: text
+        })
+    });
+  
+    if (!response.body) {
+      console.error('ReadableStream not supported in this environment.');
+      return;
+    }
+  
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+  
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+  
+      buffer += decoder.decode(value, { stream: true });
+  
+      // Split buffer by newlines to process SSE lines
+      let lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line for next chunk
+  
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+  
+          if (data === '[DONE]') {
+            console.log('Stream finished');
+            console.log(finalMessage)
+            return;
+          }
+  
+          // Process the chunk data (usually JSON or text)
+          console.log('Received chunk:', data);
+          let jsonData = await JSON.parse(data)
+          console.log('...')
+          console.log(jsonData.response)
+          finalMessage = finalMessage + jsonData.response
+          // For example, if data is JSON:
+          // const parsed = JSON.parse(data);
+          // update UI with parsed content
+        }
+      }
+    }
+  }
+streamSSE('https://ln-worker.judah-ddd.workers.dev', sample);
+  
