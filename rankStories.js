@@ -3,7 +3,7 @@
 
 module.exports = async function rankStories(summaries) {
 
-	const url = 'https://ln-worker.judah-ddd.workers.dev//validate-captcha-token';
+	const url = 'https://ln-worker.lightlabs.workers.dev//validate-captcha-token';
 	const response = await fetch(url, {
 		method: 'POST',
 		headers: {

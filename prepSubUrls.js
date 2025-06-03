@@ -1,44 +1,64 @@
+// import scrapeASite from './scrapeASite.js';
+// import fs from 'fs';
+// import extractStories from './extractStories.js';
+// import summarize from './summarize.js';
+// import rankStories from './rankStories.js';
+// import getSummaryTags from './getSummaryTags.js';
+// import extractArticleInfo from './condenseInfo.js';
+
 const scrapeASite = require('./scrapeASite.js');
 const fs = require('fs');
 const extractStories = require('./extractStories.js')
 const summarize = require('./summarize.js')
 const rankStories = require('./rankStories.js');
 const getSummaryTags = require('./getSummaryTags.js');
+const extractArticleInfo = require('./condenseInfo.js');
 
-module.exports = async function prepSubUrls(){
+// export default async function prepSubUrls(){
+module.exports = prepSubUrls
+async function prepSubUrls() {
+		const daySubUrls = []
+		const mainUrls = await JSON.parse(fs.readFileSync('./data/MainUrls.json', 'utf8'));
+		const urlMatchList = await JSON.parse(fs.readFileSync('./data/UrlPatterns.json', 'utf8'))
+		const mdResponseCount = await JSON.parse(fs.readFileSync('./data/mdResponseCount.json', 'utf8'))
+		let currentIter = mdResponseCount.mdResponseCount + 1
+		const todaysSummaries = [];
 
-	const daySubUrls = []
-	const mainUrls = await JSON.parse(fs.readFileSync('./data/MainUrls.json', 'utf8'));
-	const urlMatchList = await JSON.parse(fs.readFileSync('./data/UrlPatterns.json', 'utf8'))
-	const mdResponseCount = await JSON.parse(fs.readFileSync('./data/mdResponseCount.json', 'utf8'))
-	let currentIter = mdResponseCount.mdResponseCount + 1
-	const todaysSummaries = [];
+		for (url in mainUrls) {
 
-	for (url in mainUrls) {
+			const siteMd = await scrapeASite(mainUrls[url])
+			const storyUrls = extractStories(siteMd, urlMatchList[mainUrls[url]])
+			storyUrls.forEach((subUrl) => {
+				daySubUrls.push(subUrl)
+			})
+		}
 
-		const siteMd = await scrapeASite(mainUrls[url])
-		const storyUrls = extractStories(siteMd, urlMatchList[mainUrls[url]])
-		storyUrls.forEach((subUrl) => {
-			daySubUrls.push(subUrl)			
-		})
-	}
-
-	fs.writeFileSync('./data/daySubUrls.json', JSON.stringify(daySubUrls, null, 4));
-
+		fs.writeFileSync('./data/daySubUrls.json', JSON.stringify(daySubUrls, null, 4));
 
 	for (const url in daySubUrls) {
+		if (url > 2) {
+			continue
+			console.log('hello')
+		}
+		console.log(url)
+		console.log(`executing on ${daySubUrls[url]}`)
 		const storyMd = await scrapeASite(daySubUrls[url])
 		fs.writeFileSync(`./data/mdResponses/md${String(currentIter)}.md`, storyMd);
 		currentIter++
 		fs.writeFileSync('./data/mdResponseCount.json', JSON.stringify({ "mdResponseCount": currentIter }))
-		const storySummary = await summarize(storyMd)
+		console.log(typeof storyMd)
+		const compressedStory = extractArticleInfo(storyMd)
+		fs.writeFileSync(`./data/mdParsedResponses/md${String(currentIter)}.md`, JSON.stringify(compressedStory, null, 4));
+		console.log(compressedStory)
+		console.log(typeof compressedStory)
+		const storySummary = await summarize(JSON.stringify(compressedStory))
 		if (storySummary.length > 200) {
 			console.log('overly long summary')
 		}
 		todaysSummaries.push(storySummary);
 	}
 	const todaysSummariesTags = await JSON.parse(fs.readFileSync('./data/todaysSummaries.json', "utf8"))
-
+	console.log(todaysSummaries)
 	todaysSummariesTags.general = todaysSummaries;
 
 	fs.writeFileSync('./data/todaysSummaries.json', JSON.stringify(todaysSummariesTags, null, 4))
@@ -54,7 +74,7 @@ module.exports = async function prepSubUrls(){
 		}
 	}
 
-	
+
 	for (cat in todaysSummariesTags) {
 		if (todaysSummariesTags[cat].length > 5) {
 			const rankedStories = await rankStories(todaysSummariesTags[cat])
@@ -77,8 +97,8 @@ module.exports = async function prepSubUrls(){
 
 async function test1() {
 	const daySubUrls = [
-		 "https://ground.news/article/labor-wins-australia-election-broadcasters-abc-sky-news-australia-say",
-    "https://ground.news/article/s-and-p-500-posts-longest-winning-streak-in-20-years-as-trump-and-china-show-some-willingness-to-bend-on-trade"
+		"https://ground.news/article/labor-wins-australia-election-broadcasters-abc-sky-news-australia-say",
+		"https://ground.news/article/s-and-p-500-posts-longest-winning-streak-in-20-years-as-trump-and-china-show-some-willingness-to-bend-on-trade"
 	]
 	let currentIter = 120
 	for (const url in daySubUrls) {
@@ -90,54 +110,11 @@ async function test1() {
 
 		// const storySummary = await summarize(storyMd)
 		// if (storySummary.length > 200) {
-			// console.log('overly long summary')
+		// console.log('overly long summary')
 		// }
 		// todaysSummaries.push(storySummary);
 	}
 }
 
-test1()
-
-/**
- * Extracts the title and summary from the given article text.
- * @param {string} articleText - The full text content of the article.
- * @returns {{title: string | null, summary: string[]}} - An object containing the 'title' and 'summary' as an array of strings,
- *   or null for 'title' and an empty array for 'summary' if not found.
- */
-function extractArticleInfo(articleText) {
-  const extractedInfo = { title: null, summary: [] };
-
-  // Regex to find the main title (starts with # and goes until the next newline)
-  // The 'm' flag enables multiline mode, allowing ^ and $ to match start/end of lines.
-  const titleMatch = articleText.match(/^#\s*(.*?)\n/m);
-  if (titleMatch) {
-    extractedInfo.title = titleMatch[1].trim();
-  }
-
-  // Regex to find the summary points.
-  // The 's' flag (dotAll) allows '.' to match newlines.
-  const summaryBlockMatch = articleText.match(
-    /(Bias Comparison\s*Bias Comparison\s*)(.*?)(?=Insights by Ground AI)/s,
-  );
-
-  if (summaryBlockMatch && summaryBlockMatch[2]) {
-    const summaryBlock = summaryBlockMatch[2];
-    // Find all lines within this block that start with '-'
-    // The 'g' flag finds all occurrences, not just the first.
-    // The 'm' flag is important here for `^` to match the start of each line in the `summaryBlock`.
-    const summaryPoints = summaryBlock.match(/^- (.*?)(?=\n|$)/gm);
-
-    if (summaryPoints) {
-      const cleanedSummaryPoints = summaryPoints.map((point) => {
-        // Remove the leading '- '
-        let cleanedPoint = point.substring(2).trim();
-        // Clean up any potential markdown links like [Anthony Albanese](...)
-        cleanedPoint = cleanedPoint.replace(/\[(.*?)\]\(.*?\)/g, '$1');
-        return cleanedPoint;
-      });
-      extractedInfo.summary = cleanedSummaryPoints;
-    }
-  }
-
-  return extractedInfo;
-}
+// test1()
+prepSubUrls()
