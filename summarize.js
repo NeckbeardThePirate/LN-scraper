@@ -1,9 +1,6 @@
-const dotenv = require('dotenv/config');
-const fs = require('fs');
-
 module.exports = async function getSummary(article) {
 
-	const url = 'https://ln-worker.judah-ddd.workers.dev/get-summary';
+	const url = 'https://ln-worker.lightlabs.workers.dev/get-summary';
 
 	const response = await fetch(url, {
 		method: 'POST',
@@ -19,7 +16,3 @@ module.exports = async function getSummary(article) {
 	const returnable = await response.json();
 	return returnable.summary.response
 }
-
-const article = fs.readFileSync('response.md', 'utf8');
-
-// getSummary(article)

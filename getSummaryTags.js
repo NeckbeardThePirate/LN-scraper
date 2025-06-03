@@ -1,6 +1,6 @@
 module.exports = async function getSummaryTags(summary) {
 
-	const url = 'https://ln-worker.judah-ddd.workers.dev/get-tags';
+	const url = 'https://ln-worker.lightlabs.workers.dev/get-tags';
 	const response = await fetch(url, {
 		method: 'POST',
 		headers: {

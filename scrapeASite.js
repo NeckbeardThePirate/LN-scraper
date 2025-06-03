@@ -1,5 +1,5 @@
-const firecrawl = require('@mendable/firecrawl-js'); // Import the module
-const FirecrawlApp = firecrawl.default; // Access the default export
+const firecrawl = require('@mendable/firecrawl-js');
+const FirecrawlApp = firecrawl.default;
 const dotenv = require('dotenv/config');
 
 const app = new FirecrawlApp({ apiKey: process.env.FC_Key });
